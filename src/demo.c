@@ -36,17 +36,6 @@ static void print_key(int key, int state)
     if (key == i) printf("[%d]: '%c'\n", state, i);
 }
 
-static void draw(double t)
-{
-  int x, y, *p = buf, ms = (int)(t*1000.0);
-  for (y=0; y<YRES; ++y) {
-    int z = y*y + ms;
-    for (x=0; x<XRES; ++x)
-      p[x] = x*x + z;
-    p += XRES;
-  }
-}
-
 static void print_char(int ch)
 {
   printf("char: %c\n", ch);
@@ -68,6 +57,17 @@ static void print_time(int ticks, int *tps, double tnow, double dt)
     assert(ctps == TICKRATE);
     printf("%.2f ms [%4d fps, %d tps] @ t = %3.2f:%d\n",
            msf, cfps, ctps, tnow, ticks);
+  }
+}
+
+static void draw(double t)
+{
+  int x, y, *p = buf, ms = (int)(t*1000.0);
+  for (y=0; y<YRES; ++y) {
+    int z = y*y + ms;
+    for (x=0; x<XRES; ++x)
+      p[x] = x*x + z;
+    p += XRES;
   }
 }
 

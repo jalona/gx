@@ -44,6 +44,13 @@ GXDEF void   gx_delay(double t);
 #include <intrin.h>
 #include <mmsystem.h>
 
+#ifdef _MSC_VER
+#pragma comment(lib, "kernel32.lib")
+#pragma comment(lib, "user32.lib")
+#pragma comment(lib, "gdi32.lib")
+#pragma comment(lib, "winmm.lib")
+#endif
+
 #define GX_w32_wm_exit (WM_USER+1)
 
 #define gx_w32_fatal(s) (MessageBoxA(0, s, "Fatal", 0), ExitProcess(1))
@@ -59,7 +66,6 @@ static struct {
   LARGE_INTEGER    tbase;
   double           tmulf;
   WNDCLASS         wc;
-  BITMAPINFO       bmi;
   HWND             win;
   HDC              dc;
   DWORD            qhead;
@@ -131,7 +137,7 @@ static LRESULT CALLBACK gx_w32_winproc(HWND hw, UINT msg, WPARAM wp, LPARAM lp)
   case WM_KEYDOWN:
     if (!(lp&(1<<30)) == !!(lp&(1<<31)))
       return 0;
-    ev.type = (lp&0x80000000) ? GX_ev_keyup : GX_ev_keydown;
+    ev.type = (lp&(1<<31)) ? GX_ev_keyup : GX_ev_keydown;
     if ((ev.key = gx_w32_vkmap[wp & 255]))
       goto post_event;
     return 0;
@@ -190,11 +196,12 @@ static DWORD WINAPI gx_w32_winthrd(void *arg)
 
   gx_w32.wc.style = CS_VREDRAW | CS_HREDRAW | CS_OWNDC;
   gx_w32.wc.lpfnWndProc = gx_w32_winproc;
-  gx_w32.wc.hInstance = GetModuleHandle(0);
+  gx_w32.wc.hInstance = GetModuleHandleW(0);
   gx_w32.wc.hIcon = LoadIcon(0, IDI_APPLICATION);
   gx_w32.wc.hCursor = LoadCursor(0, IDC_ARROW);
   gx_w32.wc.lpszClassName = "gx";
-  RegisterClass(&gx_w32.wc);
+  if (!RegisterClass(&gx_w32.wc))
+    gx_w32_fatal("RegisterClass");
 
   gx_w32_adjsize(&w, &h);
   gx_w32.win = CreateWindow("gx", title, WS_OVERLAPPEDWINDOW|WS_VISIBLE,
@@ -253,11 +260,9 @@ GXDEF void gx_exit(void)
 {
   if (!gx_w32.init)
     return;
-  if (gx_w32.th) {
-    PostThreadMessage(gx_w32.tid, GX_w32_wm_exit, 0, 0);
-    WaitForSingleObject(gx_w32.th, INFINITE);
-    CloseHandle(gx_w32.th);
-  }
+  PostThreadMessage(gx_w32.tid, GX_w32_wm_exit, 0, 0);
+  WaitForSingleObject(gx_w32.th, INFINITE);
+  CloseHandle(gx_w32.th);
   DeleteCriticalSection(&gx_w32.cs);
   gx_w32.qhead = gx_w32.qtail = 0;
   gx_w32.init = 0;
@@ -273,15 +278,11 @@ GXDEF int gx_poll(gx_event *ev)
 GXDEF void gx_paint(const void *buf, int w, int h)
 {
   static BITMAPINFO bmi = {sizeof(BITMAPINFOHEADER), 0, 0, 1, 32, BI_RGB};
-  int dw, dh;
-
+  int dw = gx_w32.winsize, dh = dw >> 16;
+  _ReadWriteBarrier();
+  dw &= 0xffff;
   bmi.bmiHeader.biWidth = w;
   bmi.bmiHeader.biHeight = -h;
-
-  dw = gx_w32.winsize;
-  _ReadWriteBarrier();
-  dh = dw >> 16;
-  dw &= 0xffff;
   if (gx_w32.init && TryEnterCriticalSection(&gx_w32.cs)) {
     StretchDIBits(gx_w32.dc, 0, 0, dw, dh, 0, 0, w, h, buf, &bmi,
                   DIB_RGB_COLORS, SRCCOPY);
