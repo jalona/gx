@@ -15,10 +15,9 @@ static int pmouse;
 
 static void print_key(int key, int state)
 {
-  int i;
-
-#define X(k) case k: printf("[%d]: %s\n", state, #k); break
+#define X(k) case k: printf("(%d) key: %s\n", state, #k); break
   switch (key) {
+  X('\b'); X('\t'); X('\r'); X(' ');
   X(GX_key_esc); X(GX_key_shift); X(GX_key_ctrl); X(GX_key_alt);
   X(GX_key_up); X(GX_key_down); X(GX_key_left); X(GX_key_right);
   X(GX_key_ins); X(GX_key_del); X(GX_key_home); X(GX_key_end);
@@ -27,13 +26,10 @@ static void print_key(int key, int state)
   X(GX_key_f8); X(GX_key_f9); X(GX_key_f10); X(GX_key_f11); X(GX_key_f12);
   X(GX_key_mb1); X(GX_key_mb2); X(GX_key_mb3); X(GX_key_mb4); X(GX_key_mb5);
 #undef X
-#define X(k) case k: printf("[%d]: %s\n", state, #k); break
-  X('\b'); X('\t'); X('\r'); X(' ');
+  default:
+    if ((key >= '0' && key <= '9') || (key >= 'a' && key <= 'z'))
+      printf("(%d) key: '%c'\n", state, key);
   }
-  for (i='0'; i<='9'; ++i)
-    if (key == i) printf("[%d]: '%c'\n", state, i);
-  for (i='a'; i<='z'; ++i)
-    if (key == i) printf("[%d]: '%c'\n", state, i);
 }
 
 static void print_char(int ch)
@@ -59,10 +55,45 @@ static void print_time(int ticks, int *tps, double tnow, double dt)
            msf, cfps, ctps, tnow, ticks);
   }
 }
-
-static void draw(double t)
+static int poll_events(void)
 {
-  int x, y, *p = buf, ms = (int)(t*1000.0);
+  gx_event ev;
+
+  while (gx_poll(&ev)) {
+    switch (ev.type) {
+    case GX_ev_quit:
+      return 1;
+    case GX_ev_keydown:
+      print_key(ev.key, 1);
+      if (ev.key == GX_key_esc)
+        return 1;
+      else if (ev.key == 'f') {
+        limitfps ^= 1;
+        printf("limitfps: %d\n", limitfps);
+      } else if (ev.key == 'm') {
+        pmouse ^= 1;
+        printf("pmouse: %d\n", pmouse);
+      }
+      break;
+    case GX_ev_keyup:
+      print_key(ev.key, 0);
+      break;
+    case GX_ev_keychar:
+      print_char(ev.key);
+      break;
+    case GX_ev_mouse:
+      if (pmouse)
+        printf("mouse: %3d,%3d\n", (int)(ev.mx*XRES), (int)(ev.my*YRES));
+      break;
+    }
+  }
+  return 0;
+}
+
+/* x' = x*talpha + (1.0-talpha)*oldx; */
+static void draw(double tnow, double talpha)
+{
+  int x, y, *p = buf, ms = (int)(tnow*1000.0);
   for (y=0; y<YRES; ++y) {
     int z = y*y + ms;
     for (x=0; x<XRES; ++x)
@@ -76,8 +107,6 @@ int main(void)
   static const double tstep = 1.0/TICKRATE;
   double tlast, tnow, tsec, dt, ddt=0.0;
   int ticks=0, tps=0, frames=0;
-  gx_event ev;
-
 #if 0
   {
     int i;
@@ -95,34 +124,10 @@ int main(void)
     dt = tnow - tlast;
     tlast = tnow;
 
-    while (gx_poll(&ev)) {
-      switch (ev.type) {
-      case GX_ev_quit:
-        goto quit;
-      case GX_ev_keydown:
-        print_key(ev.key, 1);
-        if (ev.key == GX_key_esc)
-          goto quit;
-        else if (ev.key == 'f') {
-          limitfps ^= 1;
-          printf("limitfps: %d\n", limitfps);
-        } else if (ev.key == 'm') {
-          pmouse ^= 1;
-          printf("pmouse: %d\n", pmouse);
-        }
-        break;
-      case GX_ev_keyup:
-        print_key(ev.key, 0);
-        break;
-      case GX_ev_keychar:
-        print_char(ev.key);
-        break;
-      case GX_ev_mouse:
-        if (pmouse)
-          printf("mouse: %3d,%3d\n", (int)(ev.mx*XRES), (int)(ev.my*YRES));
-        break;
-      }
-    }
+    if (dt > 0.25) dt = 0.25;
+
+    if (poll_events())
+      break;
 
     ddt += dt;
     while (ddt >= tstep) {
@@ -131,7 +136,7 @@ int main(void)
       ++tps;
     }
 
-    draw(tnow);
+    draw(tnow, ddt/dt);
     gx_paint(buf, XRES, YRES);
     ++frames;
     print_time(ticks, &tps, tnow, dt);
@@ -141,7 +146,7 @@ int main(void)
       while (gx_time() - tnow < tmax);
     }
   }
-quit:
+
   tsec = gx_time();
   printf("--- timing report ---\n"
          "ticks    : %d\n"
