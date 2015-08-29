@@ -115,6 +115,7 @@ static const unsigned char gx_w32_vkmap[256] = {
 
 static LRESULT CALLBACK gx_w32_winproc(HWND hw, UINT msg, WPARAM wp, LPARAM lp)
 {
+  int w, h;
   gx_event ev = {0};
 
   switch (msg) {
@@ -126,6 +127,13 @@ static LRESULT CALLBACK gx_w32_winproc(HWND hw, UINT msg, WPARAM wp, LPARAM lp)
     if ((ev.key = gx_w32_vkmap[wp & 255]))
       goto post_event;
     return 0;
+  case WM_MOUSEMOVE:
+    w = gx_w32.winsize & 0xffff;
+    h = gx_w32.winsize >> 16;
+    ev.type = GX_ev_mouse;
+    ev.mx = (int)(short)LOWORD(lp) / (float)w;
+    ev.my = (int)(short)HIWORD(lp) / (float)h;
+    goto post_event;
   case WM_SIZE:
     _ReadWriteBarrier();
     gx_w32.winsize = (int)lp;

@@ -31,6 +31,9 @@ int main(void)
         if (ev.key == GX_key_esc)
           goto quit;
         break;
+      case GX_ev_mouse:
+        printf("mouse: %3d,%3d\n", (int)(ev.mx*XRES), (int)(ev.my*YRES));
+        break;
       }
     }
     draw(gx_time());
