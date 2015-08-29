@@ -106,7 +106,7 @@ static const unsigned char gx_w32_vkmap[256] = {
   GX_key_home, GX_key_left, GX_key_up, GX_key_right, GX_key_down,
   0, 0, 0, 0, GX_key_ins, GX_key_del, 0, '0', '1', '2', '3', '4', '5',
   '6', '7', '8', '9', 0, 0, 0, 0, 0, 0, 0, 'a', 'b', 'c', 'd', 'e', 'f',
-  'g', 'h', 'i', 'j', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 's', 't',
+  'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
   'u', 'v', 'w', 'x', 'y', 'z', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, GX_key_f1, GX_key_f2, GX_key_f3, GX_key_f4, GX_key_f5,
   GX_key_f6, GX_key_f7, GX_key_f8, GX_key_f9, GX_key_f10, GX_key_f11,
@@ -119,11 +119,13 @@ static LRESULT CALLBACK gx_w32_winproc(HWND hw, UINT msg, WPARAM wp, LPARAM lp)
   gx_event ev = {0};
 
   switch (msg) {
+  case WM_SYSKEYUP:
+  case WM_SYSKEYDOWN:
   case WM_KEYUP:
   case WM_KEYDOWN:
     if ((lp & 0xffff) > 1)
       return 0;
-    ev.type = msg == WM_KEYDOWN ? GX_ev_keydown : GX_ev_keyup;
+    ev.type = (lp&0x80000000) ? GX_ev_keyup : GX_ev_keydown;
     if ((ev.key = gx_w32_vkmap[wp & 255]))
       goto post_event;
     return 0;
