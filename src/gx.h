@@ -121,6 +121,10 @@ static LRESULT CALLBACK gx_w32_winproc(HWND hw, UINT msg, WPARAM wp, LPARAM lp)
   switch (msg) {
   case WM_SYSKEYUP:
   case WM_SYSKEYDOWN:
+    if ((lp&(1<<29)) && !(lp&(1<<31)) && wp == VK_F4) {
+      PostQuitMessage(0);
+      return 0;
+    }
   case WM_KEYUP:
   case WM_KEYDOWN:
     if ((lp & 0xffff) > 1)
