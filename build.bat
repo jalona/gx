@@ -1,6 +1,6 @@
 @echo off
 
-set dwarn=-wd4706 -wd4127 -wd4996 -wd4100
+set dwarn=-wd4706 -wd4127 -wd4996 -wd4100 -wd4204
 set cflags=-Od -Oi -Z7 -MD -GS- -FC -W4 -nologo %dwarn%
 set lflags=-subsystem:console -dynamicbase:no -opt:ref -map -nologo
 set libs=kernel32.lib user32.lib gdi32.lib winmm.lib
