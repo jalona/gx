@@ -216,8 +216,8 @@ GXDEF void gx_init(const char *title, int w, int h)
     _mm_pause();
   }
   timeBeginPeriod(1);
-  QueryPerformanceCounter(&gx_w32.tbase);
   QueryPerformanceFrequency(&freq);
+  QueryPerformanceCounter(&gx_w32.tbase);
   gx_w32.tmulf = 1.0 / (double)freq.QuadPart;
   gx_w32.init = 1;
 }

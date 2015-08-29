@@ -1,11 +1,16 @@
 #include <stdio.h>
+#include <assert.h>
 #define GX_STATIC
 #define GX_DEFINE
 #include "gx.h"
 
-#define XRES 640
-#define YRES 480
+#define TICKRATE 60
+#define XRES    640
+#define YRES    480
+
 static int buf[XRES*YRES];
+static int maxfps = 60;
+static int limitfps;
 
 static void print_key(int key, int state)
 {
@@ -46,11 +51,39 @@ static void print_char(int ch)
   printf("char: %c\n", ch);
 }
 
+static void print_time(int ticks, int *tps, double tnow, double dt)
+{
+  static double ddt, msf;
+  static int cfps, fps, ctps;
+
+  ++fps;
+
+  ddt += dt;
+  if (ddt >= 1.0) {
+    ddt -= 1.0;
+    cfps = fps, fps = 0;
+    ctps = *tps, *tps = 0;
+    msf = 1000.0*dt;
+    assert(ctps == TICKRATE);
+    printf("%.2f ms [%4d fps, %d tps] @ t = %3.2f:%d\n",
+           msf, cfps, ctps, tnow, ticks);
+  }
+}
+
 int main(void)
 {
+  static const double tstep = 1.0/TICKRATE;
+  double tlast, tnow, tsec, dt, ddt=0.0;
+  int ticks=0, tps=0, frames=0;
   gx_event ev;
+
   gx_init("demo", XRES, YRES);
+  tlast = gx_time();
   while (1) {
+    tnow = gx_time();
+    dt = tnow - tlast;
+    tlast = tnow;
+
     while (gx_poll(&ev)) {
       switch (ev.type) {
       case GX_ev_quit:
@@ -59,6 +92,10 @@ int main(void)
         print_key(ev.key, 1);
         if (ev.key == GX_key_esc)
           goto quit;
+        else if (ev.key == 'f') {
+          limitfps ^= 1;
+          printf("limitfps: %d\n", limitfps);
+        }
         break;
       case GX_ev_keyup:
         print_key(ev.key, 0);
@@ -71,10 +108,32 @@ int main(void)
         break;
       }
     }
-    draw(gx_time());
+
+    ddt += dt;
+    while (ddt >= tstep) {
+      ddt -= tstep;
+      ++ticks;
+      ++tps;
+    }
+
+    draw(tnow);
     gx_paint(buf, XRES, YRES);
-    gx_delay(0.001);
+    ++frames;
+    print_time(ticks, &tps, tnow, dt);
+    if (limitfps && maxfps) {
+      double tmax = 1.0 / maxfps;
+      while (gx_time() - tnow < tmax-0.002) gx_delay(0.001);
+      while (gx_time() - tnow < tmax);
+    }
   }
 quit:
+  tsec = gx_time();
+  printf("--- timing report ---\n"
+         "ticks    : %d\n"
+         "frames   : %d\n"
+         "time     : %.2f\n"
+         "tickrate : %.2f\n"
+         "fps      : %.2f\n",
+         ticks, frames, tsec, ticks/tsec, frames/tsec);
   return 0;
 }
