@@ -127,7 +127,7 @@ static LRESULT CALLBACK gx_w32_winproc(HWND hw, UINT msg, WPARAM wp, LPARAM lp)
     }
   case WM_KEYUP:
   case WM_KEYDOWN:
-    if ((lp & 0xffff) > 1)
+    if (!(lp&(1<<30)) == !!(lp&(1<<31)))
       return 0;
     ev.type = (lp&0x80000000) ? GX_ev_keyup : GX_ev_keydown;
     if ((ev.key = gx_w32_vkmap[wp & 255]))
