@@ -77,6 +77,16 @@ int main(void)
   int ticks=0, tps=0, frames=0;
   gx_event ev;
 
+#if 0
+  {
+    int i;
+    for (i=0; i<100; ++i) {
+      gx_init("demo", XRES, YRES);
+      gx_delay(0.01);
+      gx_exit();
+    }
+  }
+#endif
   gx_init("demo", XRES, YRES);
   tlast = gx_time();
   while (1) {

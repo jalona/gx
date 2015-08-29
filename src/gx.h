@@ -44,6 +44,8 @@ GXDEF void   gx_delay(double t);
 #include <intrin.h>
 #include <mmsystem.h>
 
+#define GX_w32_wm_exit (WM_USER+1)
+
 #define gx_w32_fatal(s) (MessageBoxA(0, s, "Fatal", 0), ExitProcess(1))
 #define gx_w32_assert(p, s) ((p) ? (void)0 : gx_w32_fatal(s))
 
@@ -148,6 +150,8 @@ static LRESULT CALLBACK gx_w32_winproc(HWND hw, UINT msg, WPARAM wp, LPARAM lp)
     _ReadWriteBarrier();
     gx_w32.winsize = (int)lp;
     return 0;
+  case WM_ERASEBKGND:
+    return 1;
   case WM_CLOSE:
     PostQuitMessage(0);
     return 0;
@@ -187,6 +191,8 @@ static DWORD WINAPI gx_w32_winthrd(void *arg)
   gx_w32.winrdy = 1;
 
   while (GetMessage(&msg, 0, 0, 0) > 0) {
+    if (msg.message == GX_w32_wm_exit)
+      break;
     TranslateMessage(&msg);
     DispatchMessage(&msg);
   }
@@ -198,6 +204,10 @@ static DWORD WINAPI gx_w32_winthrd(void *arg)
     ReleaseDC(gx_w32.win, gx_w32.dc);
     DestroyWindow(gx_w32.win);
     UnregisterClass("gx", gx_w32.wc.hInstance);
+    gx_w32.win = 0;
+    gx_w32.dc = 0;
+    gx_w32.winrdy = 0;
+    gx_w32.winsize = 0;
   LeaveCriticalSection(&gx_w32.cs);
 
   return 0;
@@ -224,6 +234,15 @@ GXDEF void gx_init(const char *title, int w, int h)
 
 GXDEF void gx_exit(void)
 {
+  if (!gx_w32.init)
+    return;
+  if (gx_w32.th) {
+    PostThreadMessage(gx_w32.tid, GX_w32_wm_exit, 0, 0);
+    WaitForSingleObject(gx_w32.th, INFINITE);
+    CloseHandle(gx_w32.th);
+  }
+  DeleteCriticalSection(&gx_w32.cs);
+  gx_w32.qhead = gx_w32.qtail = 0;
   gx_w32.init = 0;
 }
 
@@ -249,6 +268,7 @@ GXDEF void gx_paint(const void *buf, int w, int h)
   if (gx_w32.init && TryEnterCriticalSection(&gx_w32.cs)) {
     StretchDIBits(gx_w32.dc, 0, 0, dw, dh, 0, 0, w, h, buf, &bmi,
                   DIB_RGB_COLORS, SRCCOPY);
+    ValidateRect(gx_w32.win, 0);
     LeaveCriticalSection(&gx_w32.cs);
   }
 }
