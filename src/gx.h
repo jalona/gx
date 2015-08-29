@@ -17,8 +17,10 @@ enum {
   /* keycodes ('\b', '\t', '\r', ' ', '0'..'9', 'a'..'z') */
   GX_key_esc = 27, GX_key_shift = 128, GX_key_ctrl, GX_key_alt,
   GX_key_up, GX_key_down, GX_key_left, GX_key_right, GX_key_ins, GX_key_del,
-  GX_key_home, GX_key_end, GX_key_pgup, GX_key_pgdn, GX_key_fn,
-  GX_key_mb1 = GX_key_fn+13, GX_key_mb2, GX_key_mb3, GX_key_mb4, GX_key_mb5
+  GX_key_home, GX_key_end, GX_key_pgup, GX_key_pgdn, GX_key_f1,
+  GX_key_f2, GX_key_f3, GX_key_f4, GX_key_f5, GX_key_f6, GX_key_f7,
+  GX_key_f8, GX_key_f9, GX_key_f10, GX_key_f11, GX_key_f12, GX_key_mb1,
+  GX_key_mb2, GX_key_mb3, GX_key_mb4, GX_key_mb5
 };
 
 typedef struct {
@@ -63,6 +65,32 @@ static struct {
   DWORD            qtail;
 } gx_w32;
 
+/* single-producer/single-consumer queue, only uses a compiler barriers
+   because x86 has acquire/release semantics on regular loads and stores */
+static int gx_w32_qwrite(const gx_event *ev)
+{
+  DWORD head = gx_w32.qhead, tail = gx_w32.qtail, ntail = (tail+1) & 255;
+  _ReadWriteBarrier();
+  if (ntail == head)
+    return 0;
+  gx_w32.qdata[tail] = *ev;
+  _ReadWriteBarrier();
+  gx_w32.qtail = ntail;
+  return 1;
+}
+
+static int gx_w32_qread(gx_event *ev)
+{
+  DWORD head = gx_w32.qhead, tail = gx_w32.qtail;
+  _ReadWriteBarrier();
+  if (head == tail)
+    return 0;
+  *ev  = gx_w32.qdata[head];
+  _ReadWriteBarrier();
+  gx_w32.qhead = (head+1) & 255;
+  return 1;
+}
+
 static void gx_w32_adjsize(int *w, int *h)
 {
   RECT r = { 0, 0, *w, *h };
@@ -71,10 +99,33 @@ static void gx_w32_adjsize(int *w, int *h)
   *h = r.bottom - r.top;
 }
 
-static unsigned char gx_w32_vkmap[256];
+static const unsigned char gx_w32_vkmap[256] = {
+  0, 0, 0, 0, 0, 0, 0, 0, '\b', '\t', 0, 0, 0, '\r', 0, 0,
+  GX_key_shift, GX_key_ctrl, GX_key_alt, 0, 0, 0, 0, 0, 0, 0, 0,
+  GX_key_esc, 0, 0, 0, 0, ' ', GX_key_pgup, GX_key_pgdn, GX_key_end,
+  GX_key_home, GX_key_left, GX_key_up, GX_key_right, GX_key_down,
+  0, 0, 0, 0, GX_key_ins, GX_key_del, 0, '0', '1', '2', '3', '4', '5',
+  '6', '7', '8', '9', 0, 0, 0, 0, 0, 0, 0, 'a', 'b', 'c', 'd', 'e', 'f',
+  'g', 'h', 'i', 'j', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 's', 't',
+  'u', 'v', 'w', 'x', 'y', 'z', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, GX_key_f1, GX_key_f2, GX_key_f3, GX_key_f4, GX_key_f5,
+  GX_key_f6, GX_key_f7, GX_key_f8, GX_key_f9, GX_key_f10, GX_key_f11,
+  GX_key_f12
+};
+
 static LRESULT CALLBACK gx_w32_winproc(HWND hw, UINT msg, WPARAM wp, LPARAM lp)
 {
+  gx_event ev = {0};
+
   switch (msg) {
+  case WM_KEYUP:
+  case WM_KEYDOWN:
+    if ((lp & 0xffff) > 1)
+      return 0;
+    ev.type = msg == WM_KEYDOWN ? GX_ev_keydown : GX_ev_keyup;
+    if ((ev.key = gx_w32_vkmap[wp & 255]))
+      goto post_event;
+    return 0;
   case WM_SIZE:
     _ReadWriteBarrier();
     gx_w32.winsize = (int)lp;
@@ -83,8 +134,11 @@ static LRESULT CALLBACK gx_w32_winproc(HWND hw, UINT msg, WPARAM wp, LPARAM lp)
     PostQuitMessage(0);
     return 0;
   }
-
   return DefWindowProc(hw, msg, wp, lp);
+
+post_event:
+  gx_w32_qwrite(&ev);
+  return 0;
 }
 
 static DWORD WINAPI gx_w32_winthrd(void *arg)
@@ -93,6 +147,7 @@ static DWORD WINAPI gx_w32_winthrd(void *arg)
   int w = (int)(((INT_PTR *)arg)[1] & 0xffff);
   int h = (int)(((INT_PTR *)arg)[1] >> 16);
   MSG msg;
+  gx_event ev;
 
   gx_w32.wc.style = CS_VREDRAW | CS_HREDRAW | CS_OWNDC;
   gx_w32.wc.lpfnWndProc = gx_w32_winproc;
@@ -117,6 +172,9 @@ static DWORD WINAPI gx_w32_winthrd(void *arg)
     TranslateMessage(&msg);
     DispatchMessage(&msg);
   }
+
+  ev.type = GX_ev_quit;
+  gx_w32_qwrite(&ev);
 
   EnterCriticalSection(&gx_w32.cs);
     ReleaseDC(gx_w32.win, gx_w32.dc);
@@ -153,7 +211,9 @@ GXDEF void gx_exit(void)
 
 GXDEF int gx_poll(gx_event *ev)
 {
-  return 0;
+  if (!gx_w32.init)
+    return 0;
+  return gx_w32_qread(ev);
 }
 
 GXDEF void gx_paint(const void *buf, int w, int h)
@@ -163,11 +223,12 @@ GXDEF void gx_paint(const void *buf, int w, int h)
 
   bmi.bmiHeader.biWidth = w;
   bmi.bmiHeader.biHeight = -h;
+
+  dw = gx_w32.winsize;
+  _ReadWriteBarrier();
+  dh = dw >> 16;
+  dw &= 0xffff;
   if (gx_w32.init && TryEnterCriticalSection(&gx_w32.cs)) {
-    dw = gx_w32.winsize;
-    _ReadWriteBarrier();
-    dh = dw >> 16;
-    dw &= 0xffff;
     StretchDIBits(gx_w32.dc, 0, 0, dw, dh, 0, 0, w, h, buf, &bmi,
                   DIB_RGB_COLORS, SRCCOPY);
     LeaveCriticalSection(&gx_w32.cs);
