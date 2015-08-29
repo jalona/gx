@@ -41,6 +41,11 @@ static void draw(double t)
   }
 }
 
+static void print_char(int ch)
+{
+  printf("char: %c\n", ch);
+}
+
 int main(void)
 {
   gx_event ev;
@@ -57,6 +62,9 @@ int main(void)
         break;
       case GX_ev_keyup:
         print_key(ev.key, 0);
+        break;
+      case GX_ev_keychar:
+        print_char(ev.key);
         break;
       case GX_ev_mouse:
         printf("mouse: %3d,%3d\n", (int)(ev.mx*XRES), (int)(ev.my*YRES));

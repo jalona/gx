@@ -133,6 +133,10 @@ static LRESULT CALLBACK gx_w32_winproc(HWND hw, UINT msg, WPARAM wp, LPARAM lp)
     if ((ev.key = gx_w32_vkmap[wp & 255]))
       goto post_event;
     return 0;
+  case WM_CHAR:
+    ev.type = GX_ev_keychar;
+    ev.key = (int)wp;
+    goto post_event;
   case WM_MOUSEMOVE:
     w = gx_w32.winsize & 0xffff;
     h = gx_w32.winsize >> 16;
