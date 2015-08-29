@@ -139,6 +139,19 @@ static LRESULT CALLBACK gx_w32_winproc(HWND hw, UINT msg, WPARAM wp, LPARAM lp)
     ev.type = GX_ev_keychar;
     ev.key = (int)wp;
     goto post_event;
+  case WM_LBUTTONUP:   ev.key = GX_key_mb1; goto btn_up;
+  case WM_MBUTTONUP:   ev.key = GX_key_mb2; goto btn_up;
+  case WM_RBUTTONUP:   ev.key = GX_key_mb3; goto btn_up;
+  case WM_LBUTTONDOWN: ev.key = GX_key_mb1; goto btn_down;
+  case WM_MBUTTONDOWN: ev.key = GX_key_mb2; goto btn_down;
+  case WM_RBUTTONDOWN: ev.key = GX_key_mb3; goto btn_down;
+  case WM_MOUSEWHEEL:
+    ev.key = ((int)wp>>16) / WHEEL_DELTA > 0 ? GX_key_mb4 : GX_key_mb5;
+    ev.type = GX_ev_keydown;
+    gx_w32_qwrite(&ev);
+    ev.type = GX_ev_keyup;
+    gx_w32_qwrite(&ev);
+    return 0;
   case WM_MOUSEMOVE:
     w = gx_w32.winsize & 0xffff;
     h = gx_w32.winsize >> 16;
@@ -157,7 +170,11 @@ static LRESULT CALLBACK gx_w32_winproc(HWND hw, UINT msg, WPARAM wp, LPARAM lp)
     return 0;
   }
   return DefWindowProc(hw, msg, wp, lp);
-
+btn_up:
+  ev.type = GX_ev_keyup;
+  goto post_event;
+btn_down:
+  ev.type = GX_ev_keydown;
 post_event:
   gx_w32_qwrite(&ev);
   return 0;

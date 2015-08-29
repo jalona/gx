@@ -11,6 +11,7 @@
 static int buf[XRES*YRES];
 static int maxfps = 60;
 static int limitfps;
+static int pmouse;
 
 static void print_key(int key, int state)
 {
@@ -24,7 +25,7 @@ static void print_key(int key, int state)
   X(GX_key_pgup); X(GX_key_pgdn); X(GX_key_f1); X(GX_key_f2);
   X(GX_key_f3); X(GX_key_f4); X(GX_key_f5); X(GX_key_f6); X(GX_key_f7);
   X(GX_key_f8); X(GX_key_f9); X(GX_key_f10); X(GX_key_f11); X(GX_key_f12);
-  /*X(GX_key_mb1); X(GX_key_mb2); X(GX_key_mb3); X(GX_key_mb4); X(GX_key_mb5*/
+  X(GX_key_mb1); X(GX_key_mb2); X(GX_key_mb3); X(GX_key_mb4); X(GX_key_mb5);
 #undef X
 #define X(k) case k: printf("[%d]: %s\n", state, #k); break
   X('\b'); X('\t'); X('\r'); X(' ');
@@ -105,6 +106,9 @@ int main(void)
         else if (ev.key == 'f') {
           limitfps ^= 1;
           printf("limitfps: %d\n", limitfps);
+        } else if (ev.key == 'm') {
+          pmouse ^= 1;
+          printf("pmouse: %d\n", pmouse);
         }
         break;
       case GX_ev_keyup:
@@ -114,7 +118,8 @@ int main(void)
         print_char(ev.key);
         break;
       case GX_ev_mouse:
-        printf("mouse: %3d,%3d\n", (int)(ev.mx*XRES), (int)(ev.my*YRES));
+        if (pmouse)
+          printf("mouse: %3d,%3d\n", (int)(ev.mx*XRES), (int)(ev.my*YRES));
         break;
       }
     }
