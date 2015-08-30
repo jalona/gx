@@ -1,0 +1,3 @@
+Simple library for writing small graphical demos.
+Provides basic keyboard/mouse handling and a highres timer.
+Assumes 32 bit BGRX pixel format (0xRRGGBB in little-endian).
