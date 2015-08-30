@@ -65,7 +65,7 @@ static struct {
   int              winsize;
   LARGE_INTEGER    tbase;
   double           tmulf;
-  WNDCLASS         wc;
+  WNDCLASSA        wc;
   HWND             win;
   HDC              dc;
   DWORD            qhead;
@@ -200,13 +200,13 @@ static DWORD WINAPI gx_w32_winthrd(void *arg)
   gx_w32.wc.hIcon = LoadIcon(0, IDI_APPLICATION);
   gx_w32.wc.hCursor = LoadCursor(0, IDC_ARROW);
   gx_w32.wc.lpszClassName = "gx";
-  if (!RegisterClass(&gx_w32.wc))
+  if (!RegisterClassA(&gx_w32.wc))
     gx_w32_fatal("RegisterClass");
 
   gx_w32_adjsize(&w, &h);
-  gx_w32.win = CreateWindow("gx", title, WS_OVERLAPPEDWINDOW|WS_VISIBLE,
-                            CW_USEDEFAULT, CW_USEDEFAULT, w, h, 0, 0,
-                            gx_w32.wc.hInstance, 0);
+  gx_w32.win = CreateWindowA("gx", title, WS_OVERLAPPEDWINDOW|WS_VISIBLE,
+                             CW_USEDEFAULT, CW_USEDEFAULT, w, h, 0, 0,
+                             gx_w32.wc.hInstance, 0);
   gx_w32_assert(gx_w32.win, "CreateWindow");
   gx_w32.dc = GetDC(gx_w32.win);
   gx_w32_assert(gx_w32.dc, "GetDC");
@@ -227,7 +227,7 @@ static DWORD WINAPI gx_w32_winthrd(void *arg)
   EnterCriticalSection(&gx_w32.cs);
     ReleaseDC(gx_w32.win, gx_w32.dc);
     DestroyWindow(gx_w32.win);
-    UnregisterClass("gx", gx_w32.wc.hInstance);
+    UnregisterClassA("gx", gx_w32.wc.hInstance);
     gx_w32.win = 0;
     gx_w32.dc = 0;
     gx_w32.winrdy = 0;
