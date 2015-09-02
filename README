@@ -1,3 +1,23 @@
+gx.h - public domain
+Written by Mårten Hansson <hmrten@gmail.com> in 2015.
+
 Simple library for writing small graphical demos.
-Provides basic keyboard/mouse handling and a highres timer.
-Assumes 32 bit BGRX pixel format (0xRRGGBB in little-endian).
+  - Provides basic keyboard/mouse handling and a highres timer.
+  - Assumes 32 bit BGRX pixel format (0xRRGGBB in little-endian).
+
+-- Documentation
+
+  #define GX_DEFINE    - define this in exactly one source file
+  #define GX_STATIC    - (optional) make all functions static
+
+  You must also define one of these
+  #define GX_W32       - use W32 implementation
+  #define GX_X11       - use X11 implementation
+
+  gx_init(title, w, h) - initialize and open a window with dimension w*h
+  gx_exit()            - cleanup.
+  gx_poll()            - read an event, returns 0 when no more events.
+  gx_paint(buf, w, h)  - draw buf consisting of w*h 32 bit pixels onto window,
+                         will stretch to fit window size.
+  gx_time()            - return time in seconds since gx_init().
+  gx_delay(s)          - sleep for at least s seconds.
