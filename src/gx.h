@@ -245,14 +245,14 @@ GXDEF void gx_init(const char *title, int w, int h)
   InitializeCriticalSection(&gx_w32.cs);
   gx_w32.th = CreateThread(0, 0, gx_w32_winthrd, arg, 0, &gx_w32.tid);
   gx_w32_assert(gx_w32.th, "CreateThread");
+  timeBeginPeriod(1);
+  QueryPerformanceFrequency(&freq);
+  gx_w32.tmulf = 1.0 / (double)freq.QuadPart;
   while (!gx_w32.winrdy) {
     _ReadWriteBarrier();
     _mm_pause();
   }
-  timeBeginPeriod(1);
-  QueryPerformanceFrequency(&freq);
   QueryPerformanceCounter(&gx_w32.tbase);
-  gx_w32.tmulf = 1.0 / (double)freq.QuadPart;
   gx_w32.init = 1;
 }
 
